@@ -1,27 +1,24 @@
 const db = require("../db");
 
 // ✅ GET ALL
-exports.getAllEmployees = (req, res) => {
+exports.getAllEmployees = (req, res, next) => {
   const sql = "SELECT * FROM employees";
 
   db.query(sql, (err, results) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
+    if (err) return next(err);
+
     res.status(200).json(results);
   });
 };
 
 // ✅ GET BY ID
-exports.getEmployeeById = (req, res) => {
+exports.getEmployeeById = (req, res, next) => {
   const id = req.params.id;
 
   const sql = "SELECT * FROM employees WHERE emp_id = ?";
 
   db.query(sql, [id], (err, results) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
+    if (err) return next(err);
 
     if (results.length === 0) {
       return res.status(404).json({ message: "Employee not found" });
@@ -32,7 +29,7 @@ exports.getEmployeeById = (req, res) => {
 };
 
 // ✅ CREATE
-exports.createEmployee = (req, res) => {
+exports.createEmployee = (req, res, next) => {
   const {
     employee_code,
     first_name,
@@ -67,9 +64,7 @@ exports.createEmployee = (req, res) => {
       manager_id
     ],
     (err, result) => {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
+      if (err) return next(err);
 
       res.status(201).json({
         message: "Employee created successfully",
@@ -80,7 +75,7 @@ exports.createEmployee = (req, res) => {
 };
 
 // ✅ UPDATE
-exports.updateEmployee = (req, res) => {
+exports.updateEmployee = (req, res, next) => {
   const id = req.params.id;
 
   const {
@@ -127,9 +122,7 @@ exports.updateEmployee = (req, res) => {
       id
     ],
     (err, result) => {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
+      if (err) return next(err);
 
       if (result.affectedRows === 0) {
         return res.status(404).json({ message: "Employee not found" });
@@ -141,15 +134,13 @@ exports.updateEmployee = (req, res) => {
 };
 
 // ✅ DELETE
-exports.deleteEmployee = (req, res) => {
+exports.deleteEmployee = (req, res, next) => {
   const id = req.params.id;
 
   const sql = "DELETE FROM employees WHERE emp_id = ?";
 
   db.query(sql, [id], (err, result) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
-    }
+    if (err) return next(err);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "Employee not found" });

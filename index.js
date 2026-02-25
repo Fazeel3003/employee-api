@@ -10,3 +10,8 @@ app.use("/employees", employeeRoutes);
 app.listen(3000, () => {
   console.log("🔥 MVC Server Running on Port 3000 🔥");
 });
+
+const errorHandler = require("./middleware/errorHandler");
+
+app.use(errorHandler);
+
