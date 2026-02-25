@@ -164,18 +164,25 @@ app.put("/employees/:id", (req, res) => {
 });
 
 
-// ✅ DELETE
-// app.delete('/employees/:id', (req, res) => {
-//     const id = parseInt(req.params.id);
-//     const index = employees.findIndex(emp => emp.id === id);
+// ✅ DELETE 
+app.delete("/employees/:id", (req, res) => {
+  const id = req.params.id;
 
-//     if (index === -1) {
-//         return res.status(404).json({ message: "Employee not found" });
-//     }
+  const sql = "DELETE FROM employees WHERE emp_id = ?";
 
-//     employees.splice(index, 1);
-//     res.json({ message: "Employee deleted successfully" });
-// });
+  db.query(sql, [id], (err, result) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+
+    res.status(200).json({ message: "Employee deleted successfully" });
+  });
+});
+
 
 app.listen(3000, () => {
     console.log("Server running on port 3000");
