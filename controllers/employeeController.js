@@ -2,12 +2,23 @@ const db = require("../db");
 
 // ✅ GET ALL
 exports.getAllEmployees = (req, res, next) => {
-  const sql = "SELECT * FROM employees";
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
 
-  db.query(sql, (err, results) => {
+  const offset = (page - 1) * limit;
+
+  const sql = "SELECT * FROM employees LIMIT ? OFFSET ?";
+
+  db.query(sql, [limit, offset], (err, results) => {
     if (err) return next(err);
 
-    res.status(200).json(results);
+    res.status(200).json({
+      success: true,
+      page,
+      limit,
+      count: results.length,
+      data: results
+    });
   });
 };
 
