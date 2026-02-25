@@ -4,23 +4,32 @@ const db = require("../db");
 exports.getAllEmployees = (req, res, next) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
-
   const offset = (page - 1) * limit;
 
-  const sql = "SELECT * FROM employees LIMIT ? OFFSET ?";
+  const dataQuery = "SELECT * FROM employees LIMIT ? OFFSET ?";
+  const countQuery = "SELECT COUNT(*) AS total FROM employees";
 
-  db.query(sql, [limit, offset], (err, results) => {
-    if (err) return next(err);
+  db.query(countQuery, (countErr, countResult) => {
+    if (countErr) return next(countErr);
 
-    res.status(200).json({
-      success: true,
-      page,
-      limit,
-      count: results.length,
-      data: results
+    const totalRecords = countResult[0].total;
+    const totalPages = Math.ceil(totalRecords / limit);
+
+    db.query(dataQuery, [limit, offset], (dataErr, results) => {
+      if (dataErr) return next(dataErr);
+
+      res.status(200).json({
+        success: true,
+        page,
+        limit,
+        totalRecords,
+        totalPages,
+        data: results
+      });
     });
   });
 };
+
 
 // ✅ GET BY ID
 exports.getEmployeeById = (req, res, next) => {
