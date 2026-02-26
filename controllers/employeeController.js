@@ -4,29 +4,75 @@ const db = require("../db");
 exports.getAllEmployees = (req, res, next) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
+  const search = req.query.search || "";
+  const sort = req.query.sort || "emp_id";
+  const order =
+  req.query.order && req.query.order.toLowerCase() === "desc"
+    ? "DESC"
+    : "ASC";
+
+
   const offset = (page - 1) * limit;
 
-  const dataQuery = "SELECT * FROM employees LIMIT ? OFFSET ?";
-  const countQuery = "SELECT COUNT(*) AS total FROM employees";
+  // ✅ Whitelisted sortable columns
+  const allowedSortFields = [
+    "emp_id",
+    "first_name",
+    "last_name",
+    "email",
+    "hire_date",
+    "created_at"
+  ];
 
-  db.query(countQuery, (countErr, countResult) => {
+  const sortField = allowedSortFields.includes(sort)
+    ? sort
+    : "emp_id";
+
+  let baseQuery = "FROM employees";
+  let searchQuery = "";
+  let queryParams = [];
+
+  if (search) {
+    searchQuery = `
+      WHERE first_name LIKE ?
+      OR last_name LIKE ?
+      OR email LIKE ?
+    `;
+    queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+
+  const countQuery = `SELECT COUNT(*) AS total ${baseQuery} ${searchQuery}`;
+  const dataQuery = `
+    SELECT * ${baseQuery}
+    ${searchQuery}
+    ORDER BY ${sortField} ${order}
+    LIMIT ? OFFSET ?
+  `;
+
+  db.query(countQuery, queryParams, (countErr, countResult) => {
     if (countErr) return next(countErr);
 
     const totalRecords = countResult[0].total;
     const totalPages = Math.ceil(totalRecords / limit);
 
-    db.query(dataQuery, [limit, offset], (dataErr, results) => {
-      if (dataErr) return next(dataErr);
+    db.query(
+      dataQuery,
+      [...queryParams, limit, offset],
+      (dataErr, results) => {
+        if (dataErr) return next(dataErr);
 
-      res.status(200).json({
-        success: true,
-        page,
-        limit,
-        totalRecords,
-        totalPages,
-        data: results
-      });
-    });
+        res.status(200).json({
+          success: true,
+          page,
+          limit,
+          totalRecords,
+          totalPages,
+          sort: sortField,
+          order,
+          data: results
+        });
+      }
+    );
   });
 };
 
