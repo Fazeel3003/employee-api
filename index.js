@@ -2,21 +2,18 @@ require("dotenv").config();
 const express = require("express");
 const app = express();
 const employeeRoutes = require("./routes/employeeRoutes");
-const PORT = process.env.PORT || 3000;
-require("./db"); // just to initialize connection
+require("./db");
 
 app.use(express.json());
 
-app.use("/employees", employeeRoutes);
+// ✅ Versioned API route
+app.use("/api/v1/employees", employeeRoutes);
 
+const errorHandler = require("./middleware/errorHandler");
+app.use(errorHandler);
 
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`🔥 MVC Server Running on Port ${PORT} 🔥`);
 });
-
-
-const errorHandler = require("./middleware/errorHandler");
-
-app.use(errorHandler);
-
