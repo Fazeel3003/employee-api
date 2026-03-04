@@ -106,22 +106,33 @@ exports.getEmployeeById = async (req, res, next) => {
 exports.createEmployee = async (req, res, next) => {
   try {
     const {
-      employee_code,
       first_name,
       last_name,
       email,
-      phone,
+      phone = null,
       hire_date,
-      status,
-      dept_id,
-      position_id,
-      manager_id
+      status = "Active",
+      role = "EMPLOYEE",   
+      dept_id = null,
+      position_id = null,
+      manager_id = null
     } = req.body;
+
+    const [lastEmployee] = await db.query(
+      "SELECT emp_id FROM employees ORDER BY emp_id DESC LIMIT 1"
+    );
+
+    const nextId = lastEmployee.length
+      ? lastEmployee[0].emp_id + 1
+      : 1;
+
+    const year = new Date().getFullYear();
+    const employee_code = `EMP-${year}-${String(nextId).padStart(4, "0")}`;
 
     const sql = `
       INSERT INTO employees
-      (employee_code, first_name, last_name, email, phone, hire_date, status, dept_id, position_id, manager_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (employee_code, first_name, last_name, email, phone, hire_date, status, role, dept_id, position_id, manager_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const [result] = await db.query(sql, [
@@ -132,6 +143,7 @@ exports.createEmployee = async (req, res, next) => {
       phone,
       hire_date,
       status,
+      role,               
       dept_id,
       position_id,
       manager_id
@@ -140,14 +152,15 @@ exports.createEmployee = async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: "Employee created successfully",
-      employeeId: result.insertId
+      employeeId: result.insertId,
+      employee_code
     });
 
   } catch (error) {
+    console.error(error);  // 👈 Keep this for debugging
     next(error);
   }
 };
-
 
 // ✅ UPDATE
 exports.updateEmployee = async (req, res, next) => {

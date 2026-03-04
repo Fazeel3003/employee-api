@@ -42,22 +42,3 @@ app.listen(PORT, () => {
   console.log(` MVC Server Running on Port ${PORT} `);
 });
 
-// Global Error Handler
-app.use((err, req, res, next) => {
-  console.error(err);
-
-  res.status(500).json({
-    success: false,
-    message: err.message || "Internal Server Error"
-  });
-});
-
-// Global Error Handler
-app.use((err, req, res, next) => {
-  console.error(err);
-
-  res.status(500).json({
-    success: false,
-    message: err.message || "Internal Server Error"
-  });
-});
