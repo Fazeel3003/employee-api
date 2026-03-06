@@ -29,7 +29,8 @@ app.use("/api/v1/employee-projects", employeeProjectRoutes);
 
 app.use("/api/v1/attendance", attendanceRoutes);
 
-app.use("/api/v1/leaves", leaveRoutes);
+// ✅ Fixed: Use leave-requests to match frontend
+app.use("/api/v1/leave-requests", leaveRoutes);
 
 app.use("/api/v1/salary-history", salaryRoutes);
 
@@ -41,4 +42,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(` MVC Server Running on Port ${PORT} `);
 });
-
