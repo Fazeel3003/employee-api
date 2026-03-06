@@ -23,13 +23,57 @@ exports.addSalaryRecord = async (req, res, next) => {
   }
 };
 
-// Get salary history
+// Get all salary history with pagination and filtering
+exports.getAllSalaryHistory = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const empId = req.query.emp_id || "";
+    const offset = (page - 1) * limit;
+
+    let whereClause = "";
+    let queryParams = [];
+
+    if (empId) {
+      whereClause = "WHERE emp_id = ?";
+      queryParams.push(empId);
+    }
+
+    // Get total count
+    const [countResult] = await db.query(
+      `SELECT COUNT(*) as total FROM salary_history ${whereClause}`,
+      queryParams
+    );
+    const totalCount = countResult[0].total;
+
+    // Get paginated data
+    const [rows] = await db.query(
+      `SELECT * FROM salary_history ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      [...queryParams, limit, offset]
+    );
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    res.status(200).json({
+      success: true,
+      data: rows,
+      page: page,
+      totalPages: totalPages,
+      totalCount: totalCount
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get salary by employee
 exports.getSalaryByEmployee = async (req, res, next) => {
   try {
     const empId = req.params.id;
 
     const [rows] = await db.query(
-      "SELECT * FROM salary_history WHERE emp_id = ?",
+      "SELECT * FROM salary_history WHERE emp_id = ? ORDER BY created_at DESC",
       [empId]
     );
 
@@ -43,17 +87,44 @@ exports.getSalaryByEmployee = async (req, res, next) => {
   }
 };
 
-//Update
+// Get salary by ID
+exports.getSalaryById = async (req, res, next) => {
+  try {
+    const id = req.params.id;
+
+    const [rows] = await db.query(
+      "SELECT * FROM salary_history WHERE salary_id = ?",
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Salary record not found"
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: rows[0]
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update salary record
 exports.updateSalaryRecord = async (req, res, next) => {
   try {
     const id = req.params.id;
-    const { salary_amount, effective_from, effective_to, change_reason } = req.body;
+    const { emp_id, salary_amount, effective_from, effective_to, change_reason } = req.body;
 
     const [result] = await db.query(
       `UPDATE salary_history
-       SET salary_amount = ?, effective_from = ?, effective_to = ?, change_reason = ?
+       SET emp_id = ?, salary_amount = ?, effective_from = ?, effective_to = ?, change_reason = ?
        WHERE salary_id = ?`,
-      [salary_amount, effective_from, effective_to, change_reason, id]
+      [emp_id, salary_amount, effective_from, effective_to, change_reason, id]
     );
 
     if (result.affectedRows === 0) {
@@ -73,7 +144,7 @@ exports.updateSalaryRecord = async (req, res, next) => {
   }
 };
 
-//Delete
+// Delete salary record
 exports.deleteSalaryRecord = async (req, res, next) => {
   try {
     const id = req.params.id;
