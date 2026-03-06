@@ -23,6 +23,37 @@ exports.markAttendance = async (req, res, next) => {
   }
 };
 
+//Get All Attendance
+exports.getAllAttendance = async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT 
+        a.attendance_id,
+        a.emp_id,
+        e.first_name,
+        e.last_name,
+        a.attendance_date,
+        a.check_in,
+        a.check_out,
+        a.attendance_status
+      FROM attendance a
+      JOIN employees e ON a.emp_id = e.emp_id
+      ORDER BY a.attendance_date DESC
+    `);
+
+    res.json({
+      success: true,
+      data: rows
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      message: "Failed to fetch attendance"
+    });
+  }
+};
+
 // Get attendance by employee
 exports.getAttendanceByEmployee = async (req, res, next) => {
   try {
