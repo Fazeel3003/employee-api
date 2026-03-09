@@ -37,17 +37,62 @@ exports.assignEmployeeToProject = async (req, res, next) => {
   }
 };
 
-//All
+//All - WITH SEARCH AND PAGINATION
 exports.getAllAssignments = async (req, res, next) => {
   try {
-    const [rows] = await db.query(
-      `SELECT * FROM employee_projects`
-    );
-
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+    
+    // Validate inputs
+    if (page < 1) page = 1;
+    if (limit < 1 || limit > 100) limit = 10;
+    
+    let query = `
+      SELECT 
+        ep.assignment_id,
+        ep.emp_id,
+        ep.project_id,
+        ep.role_name,
+        ep.allocation_percent,
+        ep.assigned_on,
+        ep.released_on,
+        CONCAT(e.first_name, ' ', e.last_name) as employee_name,
+        p.project_name as project_name
+      FROM employee_projects ep
+      LEFT JOIN employees e ON ep.emp_id = e.emp_id
+      LEFT JOIN projects p ON ep.project_id = p.project_id
+    `;
+    
+    let params = [];
+    
+    if (search && search.trim() !== "") {
+      query += ` WHERE 
+        e.first_name LIKE ? OR 
+        e.last_name LIKE ? OR 
+        p.project_name LIKE ? OR 
+        ep.role_name LIKE ?
+      `;
+      const searchTerm = `%${search.trim()}%`;
+      params = [searchTerm, searchTerm, searchTerm, searchTerm];
+    }
+    
+    query += ` ORDER BY ep.assignment_id`;
+    
+    const [rows] = await db.query(query, params);
+    
+    // Apply pagination
+    const totalCount = rows.length;
+    const totalPages = Math.ceil(totalCount / limit);
+    const startIndex = (page - 1) * limit;
+    const paginatedResults = rows.slice(startIndex, startIndex + limit);
+    
     res.status(200).json({
       success: true,
-      count: rows.length,
-      data: rows
+      data: paginatedResults,
+      page: page,
+      totalPages: totalPages,
+      totalCount: totalCount
     });
 
   } catch (error) {
