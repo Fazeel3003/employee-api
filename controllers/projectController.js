@@ -44,19 +44,24 @@ exports.getProjectById = async (req, res, next) => {
 // ✅ CREATE PROJECT
 exports.createProject = async (req, res, next) => {
   try {
+    
     const {
       project_name,
       start_date,
       end_date,
-      status
+      budget,
+      status,
+      project_manager_id
     } = req.body;
+
 
     const [result] = await db.query(
       `INSERT INTO projects 
-       (project_name, start_date, end_date, status)
-       VALUES (?, ?, ?, ?)`,   
-      [project_name, start_date, end_date, status]
+       (project_name, start_date, end_date, budget, status, project_manager_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,   
+      [project_name, start_date, end_date, budget, status, project_manager_id]
     );
+
 
     res.status(201).json({
       success: true,
@@ -65,6 +70,8 @@ exports.createProject = async (req, res, next) => {
     });
 
   } catch (error) {
+    console.error("Database error in createProject:", error);
+    console.error("SQL Error details:", error.sqlMessage);
     next(error);
   }
 };
@@ -79,17 +86,22 @@ exports.updateProject = async (req, res, next) => {
       project_name,
       start_date,
       end_date,
-      status
+      budget,
+      status,
+      project_manager_id
     } = req.body;
+
 
     const [result] = await db.query(
       `UPDATE projects SET
         project_name = ?,
         start_date = ?,
         end_date = ?,
-        status = ?
+        budget = ?,
+        status = ?,
+        project_manager_id = ?
        WHERE project_id = ?`,
-      [project_name, start_date, end_date, status, id]
+      [project_name, start_date, end_date, budget, status, project_manager_id, id]
     );
 
     if (result.affectedRows === 0) {
@@ -105,6 +117,8 @@ exports.updateProject = async (req, res, next) => {
     });
 
   } catch (error) {
+    console.error("Database error in updateProject:", error);
+    console.error("SQL Error details:", error.sqlMessage);
     next(error);
   }
 };
