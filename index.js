@@ -2,6 +2,9 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const app = express();
+
+// Import routes
+const authRoutes = require("./routes/authRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const employeeProjectRoutes = require("./routes/employeeProjectRoutes");
 const departmentRoutes = require("./routes/departmentRoutes");
@@ -13,10 +16,21 @@ const salaryRoutes = require("./routes/salaryRoutes");
 
 require("./db");
 
-app.use(cors());
-app.use(express.json());
+// Enhanced CORS configuration
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-// ✅ Versioned API route
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// ✅ Authentication routes (public)
+app.use("/api/v1/auth", authRoutes);
+
+// ✅ Versioned API routes (protected)
 app.use("/api/v1/employees", employeeRoutes);
 
 app.use("/api/v1/departments", departmentRoutes);

@@ -1,7 +1,10 @@
 const db = require("../db");
+const { verifyToken, verifyRole } = require("../middleware/authMiddleware");
 
 // ✅ GET ALL (with pagination, search, sorting)
 exports.getAllEmployees = async (req, res, next) => {
+  // Apply authentication middleware manually for this example
+  // In routes, you would use: router.get('/', [verifyToken, verifyRole(['admin', 'manager'])], employeeController.getAllEmployees);
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;

@@ -87,17 +87,26 @@ exports.getLeaveByEmployee = async (req, res, next) => {
   }
 };
 
-// Update leave status
+// Update leave request details (NOT status - use approve/reject endpoints for status changes)
 exports.updateLeaveStatus = async (req, res, next) => {
   try {
     const id = req.params.id;
-    const { approval_status, approved_by } = req.body;
+    const { emp_id, leave_type, start_date, end_date, reason, approval_status } = req.body;
 
+    // SECURITY: Prevent status changes through general edit endpoint
+    if (approval_status !== undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Status cannot be changed through edit endpoint. Use approve/reject endpoints."
+      });
+    }
+
+    // Only allow editing of details, not status
     const [result] = await db.query(
       `UPDATE leave_requests
-       SET approval_status = ?, approved_by = ?
+       SET emp_id = ?, leave_type = ?, start_date = ?, end_date = ?, reason = ?
        WHERE leave_id = ?`,
-      [approval_status, approved_by, id]
+      [emp_id, leave_type, start_date, end_date, reason, id]
     );
 
     if (result.affectedRows === 0) {
@@ -109,7 +118,7 @@ exports.updateLeaveStatus = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      message: "Leave status updated successfully"
+      message: "Leave request updated successfully"
     });
 
   } catch (error) {
