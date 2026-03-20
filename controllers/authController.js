@@ -6,6 +6,16 @@ const db = require('../db');
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
 const JWT_EXPIRE = process.env.JWT_EXPIRE || '7d';
 
+/*
+ * JWT PAYLOAD STANDARD:
+ * Always sign with: { userId, email, name, role }
+ * Always read with: req.user.userId
+ * NEVER change these property names!
+ * 
+ * LOGIN:   jwt.sign({ userId: user.id, ... })
+ * VERIFY:  const userId = req.user?.userId || req.user?.id || req.user?.user_id
+ */
+
 /**
  * User Registration
  * POST /api/v1/auth/register
@@ -420,9 +430,77 @@ const logAuditEvent = async (userId, action, resource, resourceId, ipAddress, us
   }
 };
 
+/**
+ * Get Current User Profile (for session restoration)
+ * GET /api/v1/auth/me
+ */
+const getMe = async (req, res) => {
+  try {
+    // Handle all possible JWT payload property names
+    const userId = req.user?.userId || req.user?.id || req.user?.user_id || req.user?.sub;
+
+    // Debug: Log what we received
+    console.log('getMe called with userId:', userId);
+    console.log('req.user object:', req.user);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User ID not found in token'
+      });
+    }
+
+    // Query user from database
+    const [rows] = await db.query(
+      `SELECT u.id, u.name, u.email, u.role, u.status, u.last_login, u.created_at
+       FROM users u
+       WHERE u.id = ?`,
+      [userId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: rows[0]
+    });
+
+  } catch (err) {
+    console.error('GetMe error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get user',
+      error: err.message
+    });
+  }
+};
+
+// GET ACTIVE SESSIONS COUNT
+const getActiveSessionsCount = async (req, res, next) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT COUNT(*) as count 
+       FROM refresh_tokens
+       WHERE expires_at > NOW()
+       AND is_revoked = 0`
+    );
+    
+    res.json({ count: rows[0].count });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
   getProfile,
-  logout
+  getMe,
+  logout,
+  getActiveSessionsCount
 };

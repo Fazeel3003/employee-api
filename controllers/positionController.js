@@ -1,261 +1,278 @@
 const db = require("../db");
 
-// GET ALL POSITIONS with pagination and search
-exports.getPositions = async (req, res) => {
+// GET ALL POSITIONS
+const getAllPositions = async (req, res) => {
   try {
-    console.log("=== Positions API Called ===");
-    console.log("Query params:", req.query);
+    // Get search query if provided
+    const search = req.query.search || ''
     
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const search = req.query.search || "";
-    
-    console.log("Parsed params:", { page, limit, search });
+    let query = `
+      SELECT 
+        p.position_id,
+        p.position_title,
+        p.min_salary,
+        p.max_salary,
+        p.dept_id,
+        d.dept_name,
+        p.created_at
+      FROM positions p
+      LEFT JOIN departments d 
+        ON p.dept_id = d.dept_id
+    `
+    const params = []
 
-    // Validate inputs
-    if (page < 1) page = 1;
-    if (limit < 1 || limit > 100) limit = 10;
-    
-    let allRows = [];
-    
-    // Try different query approaches to handle potential schema issues
-    try {
-      if (search && search.trim() !== "") {
-        // First try: Search only in position_title (most likely to be string)
-        console.log("Trying search in position_title only...");
-        const searchTerm = `%${search.trim()}%`;
-        const [searchResults] = await db.query(
-          "SELECT * FROM positions WHERE position_title LIKE ?", 
-          [searchTerm]
-        );
-        allRows = searchResults;
-        console.log("Position title search found:", allRows.length, "rows");
-        
-        // If no results, try department field
-        if (allRows.length === 0) {
-          console.log("Trying search in department only...");
-          const [deptResults] = await db.query(
-            "SELECT * FROM positions WHERE department LIKE ?", 
-            [searchTerm]
-          );
-          allRows = deptResults;
-          console.log("Department search found:", allRows.length, "rows");
-        }
-      } else {
-        // No search - get all positions
-        console.log("Getting all positions (no search)...");
-        const [allResults] = await db.query("SELECT * FROM positions");
-        allRows = allResults;
-        console.log("All positions query found:", allRows.length, "rows");
-      }
-    } catch (dbError) {
-      console.error("=== DATABASE QUERY ERROR ===");
-      console.error("Database error:", dbError);
-      console.error("SQL Error Code:", dbError.code);
-      console.error("SQL Error Message:", dbError.message);
-      console.error("SQL Error Details:", dbError.sqlMessage);
-      
-      // Try fallback: Get all positions and filter in JavaScript
-      console.log("Trying fallback: Get all positions and filter in JS...");
-      try {
-        const [fallbackResults] = await db.query("SELECT * FROM positions");
-        allRows = fallbackResults;
-        
-        if (search && search.trim() !== "") {
-          const searchTerm = search.trim().toLowerCase();
-          allRows = allRows.filter(row => {
-            try {
-              return (
-                (row.position_title && row.position_title.toLowerCase().includes(searchTerm)) ||
-                (row.department && row.department.toLowerCase().includes(searchTerm))
-              );
-            } catch (filterError) {
-              console.error("Filter error for row:", row, filterError);
-              return false;
-            }
-          });
-        }
-        console.log("Fallback filtering found:", allRows.length, "rows");
-      } catch (fallbackError) {
-        console.error("Fallback also failed:", fallbackError);
-        throw fallbackError;
-      }
+    // Add search filter if provided
+    if (search) {
+      query += ` WHERE p.position_title 
+        LIKE ?`
+      params.push(`%${search}%`)
     }
-    
-    // Validate results
-    if (!Array.isArray(allRows)) {
-      console.error("Invalid query result:", allRows);
-      return res.status(500).json({
-        success: false,
-        message: "Database query returned invalid results",
-        details: "Expected array but got " + typeof allRows
-      });
-    }
-    
-    // Apply pagination in JavaScript
-    const totalCount = allRows.length;
-    const totalPages = Math.ceil(totalCount / limit);
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedRows = allRows.slice(startIndex, endIndex);
-    
-    console.log("Pagination applied:", { 
-      totalCount, 
-      totalPages, 
-      page, 
-      startIndex, 
-      endIndex, 
-      returnedRows: paginatedRows.length 
-    });
 
-    const response = {
-      success: true,
-      data: paginatedRows,
-      page: page,
-      totalPages: totalPages,
-      totalCount: totalCount
-    };
-    
-    console.log("Sending response:", response);
-    res.status(200).json(response);
-    
-  } catch (error) {
-    console.error("=== MAJOR ERROR ===");
-    console.error("Error details:", error);
-    console.error("Error stack:", error.stack);
-    console.error("Query params that caused error:", req.query);
-    
-    res.status(500).json({
-      success: false,
-      message: "Server error occurred",
-      details: error.message,
-      query: req.query,
-      stack: error.stack
-    });
-  }
-};
-
-exports.getPositionById = async (req, res) => {
-  try {
-    const { id } = req.params;
+    query += ` ORDER BY p.position_title ASC` 
 
     const [rows] = await db.query(
-      "SELECT * FROM positions WHERE position_id = ?",
+      query, params)
+
+    res.json({
+      success: true,
+      data: rows,
+      total: rows.length
+    })
+  } catch (err) {
+    console.error(
+      'getAllPositions error:', err)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch positions',
+      error: err.message
+    })
+  }
+}
+
+// GET POSITION BY ID
+const getPositionById = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const [rows] = await db.query(
+      `SELECT p.*, d.dept_name
+       FROM positions p
+       LEFT JOIN departments d
+         ON p.dept_id = d.dept_id
+       WHERE p.position_id = ?`,
       [id]
-    );
+    )
 
     if (rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "Position not found",
-      });
+        message: 'Position not found'
+      })
     }
 
     res.json({
       success: true,
-      data: rows[0],
-    });
-  } catch (error) {
-    console.log(error);
+      data: rows[0]
+    })
+  } catch (err) {
+    console.error(
+      'getPositionById error:', err)
     res.status(500).json({
       success: false,
-      message: error.message,
-    });
+      message: 'Failed to fetch position',
+      error: err.message
+    })
   }
-};
+}
 
-//Create Position
-exports.createPosition = async (req, res) => {
+// CREATE POSITION
+const createPosition = async (req, res) => {
   try {
-    const { position_title, min_salary, max_salary, dept_id } = req.body;
+    const { 
+      position_title,
+      min_salary,
+      max_salary,
+      dept_id
+    } = req.body
 
-    if (!position_title || !dept_id) {
+    // Validate required field
+    if (!position_title?.trim()) {
       return res.status(400).json({
         success: false,
-        message: "Position title and department ID are required",
-      });
+        message: 'Position title is required'
+      })
     }
 
+    // Check for duplicate
+    const [existing] = await db.query(
+      `SELECT position_id FROM positions 
+       WHERE LOWER(position_title) = 
+       LOWER(?)`,
+      [position_title.trim()]
+    )
+
+    if (existing.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Position title already exists'
+      })
+    }
+
+    // Insert with correct column names
     const [result] = await db.query(
       `INSERT INTO positions 
-       (position_title, min_salary, max_salary, dept_id) 
+        (position_title, min_salary, 
+         max_salary, dept_id)
        VALUES (?, ?, ?, ?)`,
-      [position_title, min_salary, max_salary, dept_id]
-    );
+      [
+        position_title.trim(),
+        min_salary || 0.00,
+        max_salary || 0.00,
+        dept_id || null
+      ]
+    )
 
-    res.status(201).json({
+    // Fetch created position with dept_name for immediate display
+    const [newPosition] = await db.query(
+      `SELECT p.*, d.dept_name
+       FROM positions p
+       LEFT JOIN departments d
+         ON p.dept_id = d.dept_id
+       WHERE p.position_id = ?`,
+      [result.insertId]
+    )
+
+    return res.status(201).json({
       success: true,
-      message: "Position created successfully",
-      position_id: result.insertId,
-    });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({
+      message: 'Position created successfully',
+      data: newPosition[0]
+    })
+
+  } catch (err) {
+    console.error(
+      'createPosition error:', err)
+    return res.status(500).json({
       success: false,
-      message: error.message,
-    });
+      message: 'Failed to create position',
+      error: err.message
+    })
   }
-};
+}
 
-//Update Position
-exports.updatePosition = async (req, res) => {
+// UPDATE POSITION
+const updatePosition = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { position_title, min_salary, max_salary, dept_id } = req.body;
+    const { id } = req.params
+    const {
+      position_title,
+      min_salary,
+      max_salary,
+      dept_id
+    } = req.body
 
-    const [result] = await db.query(
-      `UPDATE positions 
-       SET position_title = ?, min_salary = ?, max_salary = ?, dept_id = ?
+    if (!position_title?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Position title is required'
+      })
+    }
+
+    // Check duplicate (exclude current)
+    const [existing] = await db.query(
+      `SELECT position_id FROM positions
+       WHERE LOWER(position_title) = 
+         LOWER(?)
+       AND position_id != ?`,
+      [position_title.trim(), id]
+    )
+
+    if (existing.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Position title already exists'
+      })
+    }
+
+    await db.query(
+      `UPDATE positions SET
+        position_title = ?,
+        min_salary = ?,
+        max_salary = ?,
+        dept_id = ?
        WHERE position_id = ?`,
-      [position_title, min_salary, max_salary, dept_id, id]
-    );
+      [
+        position_title.trim(),
+        min_salary || 0.00,
+        max_salary || 0.00,
+        dept_id || null,
+        id
+      ]
+    )
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Position not found",
-      });
-    }
-
-    res.json({
+    return res.status(200).json({
       success: true,
-      message: "Position updated successfully",
-    });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
+      message: 'Position updated successfully'
+    })
 
-//Delete Position
-exports.deletePosition = async (req, res) => {
+  } catch (err) {
+    console.error(
+      'updatePosition error:', err)
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update position',
+      error: err.message
+    })
+  }
+}
+
+// DELETE POSITION
+const deletePosition = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params
 
-    const [result] = await db.query(
-      "DELETE FROM positions WHERE position_id = ?",
+    // Check if position is in use
+    const [inUse] = await db.query(
+      `SELECT emp_id FROM employees
+       WHERE position_id = ?
+       LIMIT 1`,
       [id]
-    );
+    )
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({
+    if (inUse.length > 0) {
+      return res.status(400).json({
         success: false,
-        message: "Position not found",
-      });
+        message: 
+          'Cannot delete position that ' +
+          'is assigned to employees'
+      })
     }
 
-    res.json({
+    await db.query(
+      `DELETE FROM positions 
+       WHERE position_id = ?`,
+      [id]
+    )
+
+    return res.status(200).json({
       success: true,
-      message: "Position deleted successfully",
-    });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({
+      message: 'Position deleted successfully'
+    })
+
+  } catch (err) {
+    console.error(
+      'deletePosition error:', err)
+    return res.status(500).json({
       success: false,
-      message: error.message,
-    });
+      message: 'Failed to delete position',
+      error: err.message
+    })
   }
-};
+}
+
+module.exports = {
+  getAllPositions,
+  getPositionById,
+  createPosition,
+  updatePosition,
+  deletePosition
+}

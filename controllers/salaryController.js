@@ -34,9 +34,53 @@ exports.getAllSalaryHistory = async (req, res, next) => {
     let whereClause = "";
     let queryParams = [];
 
-    if (empId) {
+    if (req.filterByUser) {
+      // USER: only their own salary
+      // Find their emp_id from users table via email
+      const [empRows] = await db.query(
+        'SELECT emp_id FROM employees WHERE email = ?',
+        [req.user.email]
+      );
+      
+      if (empRows.length === 0) {
+        return res.json({ 
+          success: true, 
+          data: [], 
+          page: 1,
+          totalPages: 0,
+          totalCount: 0
+        });
+      }
+      
       whereClause = "WHERE emp_id = ?";
-      queryParams.push(empId);
+      queryParams = [empRows[0].emp_id];
+
+    } else if (req.filterByManager) {
+      // MANAGER: only their team's salary
+      const [mgrRows] = await db.query(
+        'SELECT emp_id FROM employees WHERE email = ?',
+        [req.user.email]
+      );
+      
+      if (mgrRows.length === 0) {
+        return res.json({ 
+          success: true, 
+          data: [], 
+          page: 1,
+          totalPages: 0,
+          totalCount: 0
+        });
+      }
+      
+      whereClause = "WHERE emp_id IN (SELECT emp_id FROM employees WHERE manager_id = ?)";
+      queryParams = [mgrRows[0].emp_id];
+
+    } else {
+      // ADMIN/HR: no filter — see all records
+      if (empId) {
+        whereClause = "WHERE emp_id = ?";
+        queryParams = [empId];
+      }
     }
 
     // Get total count
@@ -166,6 +210,38 @@ exports.deleteSalaryRecord = async (req, res, next) => {
       message: "Salary record deleted successfully"
     });
 
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET TOTAL SALARY
+exports.getTotalSalary = async (req, res, next) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT SUM(salary_amount) as total,
+              COUNT(*) as count
+       FROM salary_history`
+    );
+    
+    res.json({ 
+      total: rows[0].total || 0,
+      count: rows[0].count || 0
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET SALARY COUNT
+exports.getSalaryCount = async (req, res, next) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT COUNT(*) as count 
+       FROM salary_history`
+    );
+    
+    res.json({ count: rows[0].count });
   } catch (error) {
     next(error);
   }

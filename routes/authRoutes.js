@@ -82,6 +82,17 @@ router.post('/logout', verifyToken, authController.logout);
 
 /**
  * @route   GET /api/v1/auth/verify
+ * @desc    Verify token endpoint
+ * @access  Private
+ */
+// Get active sessions count
+router.get('/sessions/count', authController.getActiveSessionsCount);
+
+// Get current user
+router.get('/me', verifyToken, authController.getMe);
+
+/**
+ * @route   GET /api/v1/auth/verify
  * @desc    Verify if token is valid
  * @access   Private
  */

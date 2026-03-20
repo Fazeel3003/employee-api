@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { ROLES } = require('../constants/roles');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
 
@@ -40,6 +41,16 @@ const verifyToken = (req, res, next) => {
     // Add user info to request object
     req.user = decoded;
     req.token = token;
+
+    // Debug: Log decoded JWT structure
+    console.log('JWT decoded successfully:', {
+      hasUserId: !!decoded.userId,
+      hasId: !!decoded.id,
+      hasUser_id: !!decoded.user_id,
+      userId: decoded.userId,
+      id: decoded.id,
+      user_id: decoded.user_id
+    });
 
     next();
 
@@ -163,12 +174,16 @@ const checkOwnership = (resourceUserIdField = 'user_id') => {
       const resourceUserId = req.params[resourceUserIdField] || req.body[resourceUserIdField];
 
       // Admin can access any resource
-      if (req.user?.role === 'admin') {
+      if (req.user?.role === ROLES.ADMIN) {
         return next();
       }
 
+      // Convert both to strings for consistent comparison
+      const currentUserIdStr = String(currentUserId);
+      const resourceUserIdStr = String(resourceUserId);
+
       // Check if user owns the resource
-      if (currentUserId && currentUserId === parseInt(resourceUserId)) {
+      if (currentUserId && currentUserIdStr === resourceUserIdStr) {
         return next();
       }
 

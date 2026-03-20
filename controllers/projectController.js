@@ -149,3 +149,47 @@ exports.deleteProject = async (req, res, next) => {
     next(error);
   }
 };
+
+// GET PROJECT COUNT
+exports.getProjectCount = async (req, res, next) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT COUNT(*) as count 
+       FROM projects`
+    );
+    
+    res.json({ count: rows[0].count });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET ACTIVE PROJECT COUNT
+exports.getActiveProjectCount = async (req, res, next) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT COUNT(*) as count 
+       FROM projects 
+       WHERE status = 'In Progress'`
+    );
+    
+    res.json({ count: rows[0].count });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET COMPLETED PROJECTS COUNT
+exports.getCompletedProjectsCount = async (req, res, next) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT COUNT(*) as count 
+       FROM projects 
+       WHERE status = 'Completed'`
+    );
+    
+    res.json({ count: rows[0].count });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -1,12 +1,16 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const controller = require("../controllers/employeeProjectController");
+const {
+  getAllEmployeeProjects,
+  createAssignment,
+  updateAssignment,
+  deleteAssignment
+} = require('../controllers/employeeProjectController');
+const { verifyToken } = require('../middleware/authMiddleware');
 
-router.post("/", controller.assignEmployeeToProject);
-router.get("/", controller.getAllAssignments);
-router.get("/employee/:id", controller.getEmployeeProjects);
-router.get("/project/:id", controller.getProjectEmployees);
-router.put("/:id", controller.updateAssignment);
-router.delete("/:id", controller.deleteAssignment);
+router.get('/', verifyToken, getAllEmployeeProjects);
+router.post('/', verifyToken, createAssignment);
+router.put('/:id', verifyToken, updateAssignment);
+router.delete('/:id', verifyToken, deleteAssignment);
 
 module.exports = router;

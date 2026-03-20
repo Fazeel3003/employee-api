@@ -16,6 +16,9 @@ const salaryRoutes = require("./routes/salaryRoutes");
 
 require("./db");
 
+// Database health check
+const db = require("./db");
+
 // Enhanced CORS configuration
 app.use(cors({
   origin: function (origin, callback) {
@@ -47,6 +50,65 @@ app.use(express.urlencoded({ extended: true }));
 
 // ✅ Authentication routes (public)
 app.use("/api/v1/auth", authRoutes);
+
+// ✅ Health check endpoint
+app.get('/api/v1/health', async (req, res) => {
+  try {
+    await db.query('SELECT 1');
+    res.json({ 
+      status: 'Healthy',
+      isHealthy: true
+    });
+  } catch (err) {
+    res.json({ 
+      status: 'Unhealthy',
+      isHealthy: false
+    });
+  }
+});
+
+// ✅ Last system activity endpoint
+app.get('/api/v1/health/last-activity', async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT MAX(timestamp) as last_activity
+       FROM audit_log`
+    );
+    
+    const lastActivity = rows[0].last_activity;
+    
+    if (!lastActivity) {
+      return res.json({ 
+        display: 'No activity yet',
+        raw: null
+      });
+    }
+
+    const diffMs = new Date() - new Date(lastActivity);
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    let display;
+    if (diffMins < 1) 
+      display = 'Just now';
+    else if (diffMins < 60) 
+      display = `${diffMins} mins ago`; 
+    else if (diffHours < 24) 
+      display = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    else 
+      display = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+
+    res.json({ 
+      display,
+      raw: lastActivity
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      error: err.message 
+    });
+  }
+});
 
 // ✅ Versioned API routes (protected)
 app.use("/api/v1/employees", employeeRoutes);

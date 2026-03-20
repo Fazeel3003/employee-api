@@ -66,7 +66,8 @@ exports.getDepartments = async (req, res) => {
     
     // Validate inputs
     if (page < 1) page = 1;
-    if (limit < 1 || limit > 100) limit = 10;
+    if (limit < 1) limit = 10;
+    if (limit > 1000) limit = 1000;
     
     let query = "SELECT dept_id, dept_name, location, budget FROM departments";
     let params = [];
@@ -240,6 +241,24 @@ exports.deleteDepartment = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error",
+    });
+  }
+};
+
+// GET DEPARTMENT COUNT
+exports.getDepartmentCount = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT COUNT(*) as count 
+       FROM departments`
+    );
+    
+    res.json({ count: rows[0].count });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message
     });
   }
 };
