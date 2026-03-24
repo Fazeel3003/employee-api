@@ -13,7 +13,21 @@ router.get("/active/count", verifyRole([ROLES.ADMIN, ROLES.HR, ROLES.MANAGER]), 
 router.get("/completed/count", verifyRole([ROLES.ADMIN, ROLES.HR, ROLES.MANAGER]), projectController.getCompletedProjectsCount);
 
 // ADMIN, HR, MANAGER - get all projects
-router.get("/", verifyRole([ROLES.ADMIN, ROLES.HR, ROLES.MANAGER]), projectController.getAllProjects);
+router.get("/", (req, res, next) => {
+  const role = req.user?.role;
+  if (role === ROLES.ADMIN || role === ROLES.HR) return next();
+  if (role === ROLES.MANAGER) {
+    req.filterByManager = true;
+    return next();
+  }
+  if (role === ROLES.USER) {
+    req.filterByUser = true;
+    return next();
+  }
+  return res.status(403).json({ 
+    success: false, message: 'Access denied' 
+  });
+}, projectController.getAllProjects);
 
 // USER - get own projects only (via employee_projects)
 router.get("/me", verifyRole([ROLES.USER]), checkOwnership('id'), projectController.getAllProjects);
@@ -27,7 +41,7 @@ router.post("/", verifyRole([ROLES.ADMIN, ROLES.MANAGER]), projectController.cre
 // ADMIN, MANAGER - update project
 router.put("/:id", verifyRole([ROLES.ADMIN, ROLES.MANAGER]), projectController.updateProject);
 
-// ADMIN, MANAGER - delete project
-router.delete("/:id", verifyRole([ROLES.ADMIN, ROLES.MANAGER]), projectController.deleteProject);
+// ADMIN only - delete project
+router.delete("/:id", verifyRole([ROLES.ADMIN]), projectController.deleteProject);
 
 module.exports = router;

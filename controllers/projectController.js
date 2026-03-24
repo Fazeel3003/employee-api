@@ -3,7 +3,42 @@ const db = require("../db");
 // ✅ GET ALL PROJECTS
 exports.getAllProjects = async (req, res, next) => {
   try {
-    const [projects] = await db.query("SELECT * FROM projects");
+    let whereClause = '';
+    let params = [];
+
+    // Check if user is Manager and filter by their managed projects + team assignments
+    if (req.filterByManager) {
+      const [mgrRows] = await db.query(
+        'SELECT emp_id FROM employees WHERE email = ?',
+        [req.user.email]
+      );
+      
+      if (mgrRows.length === 0) {
+        return res.json({ 
+          success: true, count: 0, data: [] 
+        });
+      }
+      
+      const managerEmpId = mgrRows[0].emp_id;  
+      whereClause = `WHERE p.project_id IN (
+        SELECT DISTINCT project_id 
+        FROM projects 
+        WHERE project_manager_id = ?
+        
+        UNION
+        
+        SELECT DISTINCT ep.project_id
+        FROM employee_projects ep
+        INNER JOIN employees e ON ep.emp_id = e.emp_id
+        WHERE e.manager_id = ?
+      )`;
+      params = [managerEmpId, managerEmpId];
+    }
+
+    const query = whereClause 
+  ? `SELECT p.* FROM projects p ${whereClause}`
+  : `SELECT * FROM projects`;
+    const [projects] = await db.query(query, params);
 
     res.status(200).json({
       success: true,

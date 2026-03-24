@@ -31,14 +31,14 @@ router.get('/team', verifyToken, verifyRole([ROLES.MANAGER]), getAllAttendance);
 // USER - own attendance only
 router.get('/me', verifyToken, verifyRole([ROLES.USER]), getAllAttendance);
 
-// ADMIN, HR, MANAGER - create attendance
-router.post('/', verifyToken, verifyRole([ROLES.ADMIN, ROLES.HR, ROLES.MANAGER]), createAttendance);
+// ADMIN, HR only - create attendance
+router.post('/', verifyToken, verifyRole([ROLES.ADMIN, ROLES.HR]), createAttendance);
 
-// ADMIN, HR, MANAGER - update attendance
-router.put('/:id', verifyToken, verifyRole([ROLES.ADMIN, ROLES.HR, ROLES.MANAGER]), updateAttendance);
+// ADMIN, HR only - update attendance
+router.put('/:id', verifyToken, verifyRole([ROLES.ADMIN, ROLES.HR]), updateAttendance);
 
-// ADMIN, HR, MANAGER - delete attendance
-router.delete('/:id', verifyToken, verifyRole([ROLES.ADMIN, ROLES.HR, ROLES.MANAGER]), deleteAttendance);
+// ADMIN, HR only - delete attendance
+router.delete('/:id', verifyToken, verifyRole([ROLES.ADMIN, ROLES.HR]), deleteAttendance);
 
 // Specific route for today's count
 router.get('/today/count', verifyToken, getTodayAttendanceCount);
