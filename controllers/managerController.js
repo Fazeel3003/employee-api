@@ -1,4 +1,4 @@
-const db = require('../config/database');
+const db = require('../db');
 
 /**
  * Get Manager's Team Members
@@ -6,42 +6,50 @@ const db = require('../config/database');
  */
 const getTeamMembers = async (req, res) => {
   try {
-    const managerEmpId = req.managerEmpId;
+    // Step 1: Get manager's employee ID using email from JWT
+    const managerEmail = req.user.email;
+    
+    const [managerResult] = await db.query(`
+      SELECT emp_id 
+      FROM employees 
+      WHERE email = ? AND status = 'Active'
+    `, [managerEmail]);
 
+    if (managerResult.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Manager not found or inactive'
+      });
+    }
+
+    const managerEmpId = managerResult[0].emp_id;
+
+    // Step 2: Get team members using manager's employee ID
     const [teamMembers] = await db.query(`
       SELECT 
         e.emp_id,
-        e.employee_code,
         e.first_name,
         e.last_name,
         e.email,
-        e.phone,
-        e.hire_date,
-        e.status,
-        d.name as department_name,
-        p.title as position_title,
-        u.email as user_email,
-        u.role as user_role
+        d.dept_name as department_name,
+        p.position_title as position_title
       FROM employees e
       LEFT JOIN departments d ON e.dept_id = d.dept_id
       LEFT JOIN positions p ON e.position_id = p.position_id
-      LEFT JOIN users u ON e.user_id = u.id
-      WHERE e.manager_id = ? AND e.status = 'active'
+      WHERE e.manager_id = ? AND e.status = 'Active'
       ORDER BY e.first_name, e.last_name
     `, [managerEmpId]);
 
     res.status(200).json({
       success: true,
-      message: 'Team members retrieved successfully',
-      data: teamMembers,
-      count: teamMembers.length
+      data: teamMembers
     });
 
   } catch (error) {
     console.error('Get team members error:', error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error while fetching team members'
+      message: 'Failed to fetch team members'
     });
   }
 };
@@ -255,37 +263,52 @@ const approveLeaveRequest = async (req, res) => {
  */
 const getTeamProjects = async (req, res) => {
   try {
-    const managerEmpId = req.managerEmpId;
+    // Step 1: Get manager's employee ID using email from JWT
+    const managerEmail = req.user.email;
+    
+    const [managerResult] = await db.query(`
+      SELECT emp_id 
+      FROM employees 
+      WHERE email = ? AND status = 'Active'
+    `, [managerEmail]);
 
+    if (managerResult.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Manager not found or inactive'
+      });
+    }
+
+    const managerEmpId = managerResult[0].emp_id;
+
+    // Step 2: Get projects assigned to team members
     const [teamProjects] = await db.query(`
-      SELECT DISTINCT
+      SELECT 
         p.project_id,
         p.project_name,
-        p.description,
-        p.start_date,
-        p.end_date,
         p.status,
-        COUNT(ep.emp_id) as team_members_count
-      FROM projects p
-      JOIN employee_projects ep ON p.project_id = ep.project_id
-      JOIN employees e ON ep.emp_id = e.emp_id
+        COUNT(ep.emp_id) AS team_size
+      FROM employees e
+      JOIN employee_projects ep ON e.emp_id = ep.emp_id
+      JOIN projects p ON ep.project_id = p.project_id
       WHERE e.manager_id = ?
-      GROUP BY p.project_id
+      GROUP BY p.project_id, p.project_name, p.status
       ORDER BY p.project_name
     `, [managerEmpId]);
 
+    console.log("TEAM PROJECTS DB RESULT:", teamProjects);
+    console.log("TEAM PROJECTS COUNT:", teamProjects.length);
+
     res.status(200).json({
       success: true,
-      message: 'Team projects retrieved successfully',
-      data: teamProjects,
-      count: teamProjects.length
+      data: teamProjects
     });
 
   } catch (error) {
     console.error('Get team projects error:', error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error while fetching team projects'
+      message: 'Failed to fetch team projects'
     });
   }
 };

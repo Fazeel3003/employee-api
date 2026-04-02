@@ -93,7 +93,30 @@ const verifyRole = (requiredRoles) => {
       const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
       
       // Get user role from request (set by verifyToken middleware)
-      const userRole = req.user?.role;
+      let userRole = req.user?.role;
+
+      // Debug logging
+      console.log('Role Verification:', {
+        userId: req.user?.userId,
+        rawRole: req.user?.role,
+        requiredRoles: roles,
+        tokenPayload: req.user
+      });
+
+      // Normalize role for backward compatibility
+      const normalizeRole = (role) => {
+        if (role === "user") return "employee";
+        return role;
+      };
+
+      userRole = normalizeRole(userRole);
+
+      console.log('Normalized Role Verification:', {
+        userId: req.user?.userId,
+        normalizedRole: userRole,
+        requiredRoles: roles,
+        hasRequiredRole: roles.includes(userRole)
+      });
 
       if (!userRole) {
         return res.status(403).json({
@@ -204,9 +227,52 @@ const checkOwnership = (resourceUserIdField = 'user_id') => {
   };
 };
 
+/**
+ * Authorize Roles Middleware
+ * @param {...string} requiredRoles - Required role(s) to access the resource
+ * @returns {Function} - Express middleware function
+ */
+const authorizeRoles = (...requiredRoles) => {
+  return verifyRole(requiredRoles);
+};
+
+/**
+ * Manager Team Access Middleware
+ * Sets req.managerEmpId for manager-specific queries
+ */
+const managerTeamAccess = async (req, res, next) => {
+  try {
+    // For managers, get their employee ID
+    if (req.user?.role === 'manager' || req.user?.role === 'admin') {
+      // For simplicity, using user ID as manager employee ID
+      // In real implementation, you'd query employees table to get emp_id
+      req.managerEmpId = req.user.userId || req.user.id;
+      
+      console.log('Manager Team Access - Manager Emp ID:', req.managerEmpId);
+      return next();
+    }
+    
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied. Manager role required.',
+      code: 'MANAGER_ACCESS_REQUIRED'
+    });
+    
+  } catch (error) {
+    console.error('Manager team access error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error during manager access check.',
+      code: 'MANAGER_ACCESS_ERROR'
+    });
+  }
+};
+
 module.exports = {
   verifyToken,
   verifyRole,
+  authorizeRoles,
+  managerTeamAccess,
   optionalAuth,
   checkOwnership
 };

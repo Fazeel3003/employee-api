@@ -10,18 +10,31 @@ router.use(verifyToken);
 // ALL ROLES - get leave requests with role-based filtering
 router.get("/", (req, res, next) => {
   const role = req.user?.role;
-  if (role === ROLES.ADMIN || role === ROLES.HR) return next();
-  if (role === ROLES.MANAGER) {
+  console.log("Leave requests route - User role:", role);
+  
+  // Normalize role for backward compatibility
+  const normalizeRole = (role) => {
+    if (role === "user") return "employee";
+    return role;
+  };
+  
+  const normalizedRole = normalizeRole(role);
+  console.log("Leave requests route - Normalized role:", normalizedRole);
+  
+  if (normalizedRole === ROLES.ADMIN || normalizedRole === ROLES.HR) return next();
+  if (normalizedRole === ROLES.MANAGER) {
     req.filterByManager = true;
     return next();
   }
-  if (role === ROLES.USER) {
+  if (normalizedRole === ROLES.USER) {
     req.filterByUser = true;
     return next();
   }
   return res.status(403).json({ 
     success: false, 
-    message: 'Access denied' 
+    message: 'Access denied',
+    role: normalizedRole,
+    allowedRoles: [ROLES.ADMIN, ROLES.HR, ROLES.MANAGER, ROLES.USER]
   });
 }, controller.getAllLeaveRequests);
 

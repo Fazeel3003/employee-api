@@ -14,23 +14,57 @@ router.get("/count", verifyRole([ROLES.ADMIN, ROLES.HR]), controller.getSalaryCo
 // ALL ROLES - get salary records with role-based filtering
 router.get("/", (req, res, next) => {
   const role = req.user?.role;
-  if (role === ROLES.ADMIN || role === ROLES.HR) return next();
-  if (role === ROLES.MANAGER) {
-    req.filterByUser = true;
+  console.log("Salary history route - User role:", role);
+
+  const normalizeRole = (role) => {
+    if (role === "user") return "employee";
+    return role;
+  };
+
+  const normalizedRole = normalizeRole(role);
+  console.log("Salary history route - Normalized role:", normalizedRole);
+
+  if (normalizedRole === ROLES.ADMIN || normalizedRole === ROLES.HR) return next();
+  if (normalizedRole === ROLES.MANAGER) {
+    req.filterByManager = true;
     return next();
   }
-  if (role === ROLES.USER) {
+  if (normalizedRole === ROLES.USER) { // ROLES.USER is now 'employee'
     req.filterByUser = true;
     return next();
   }
   return res.status(403).json({ 
     success: false, 
-    message: 'Access denied' 
+    message: 'Access denied',
+    role: normalizedRole,
+    allowedRoles: [ROLES.ADMIN, ROLES.HR, ROLES.MANAGER, ROLES.USER]
   });
 }, controller.getAllSalaryHistory);
 
 // USER, MANAGER - get own salary only
-router.get("/me", verifyRole([ROLES.USER, ROLES.MANAGER]), checkOwnership('id'), controller.getAllSalaryHistory);
+router.get("/me", (req, res, next) => {
+  const role = req.user?.role;
+  console.log("Salary /me route - User role:", role);
+
+  const normalizeRole = (role) => {
+    if (role === "user") return "employee";
+    return role;
+  };
+
+  const normalizedRole = normalizeRole(role);
+  console.log("Salary /me route - Normalized role:", normalizedRole);
+
+  if (normalizedRole === ROLES.USER || normalizedRole === ROLES.MANAGER) {
+    req.filterByUser = true;
+    return next();
+  }
+  return res.status(403).json({ 
+    success: false, 
+    message: 'Access denied',
+    role: normalizedRole,
+    allowedRoles: [ROLES.USER, ROLES.MANAGER]
+  });
+}, controller.getAllSalaryHistory);
 
 // ADMIN, HR - create salary record
 router.post("/", verifyRole([ROLES.ADMIN, ROLES.HR]), controller.addSalaryRecord);

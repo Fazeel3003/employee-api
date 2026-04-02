@@ -245,12 +245,17 @@ const login = async (req, res) => {
     }
 
     // Generate JWT token
+    console.log("LOGIN USER DATA:", user);
+    console.log("LOGIN USER ROLE:", user.role);
+    
     const tokenPayload = {
       userId: user.id,
       email: user.email,
       name: user.name,
       role: user.role
     };
+
+    console.log("JWT TOKEN PAYLOAD:", tokenPayload);
 
     const token = jwt.sign(tokenPayload, JWT_SECRET, {
       expiresIn: JWT_EXPIRE,
@@ -450,10 +455,24 @@ const getMe = async (req, res) => {
       });
     }
 
-    // Query user from database
+    // Query user with employee information via email join
     const [rows] = await db.query(
-      `SELECT u.id, u.name, u.email, u.role, u.status, u.last_login, u.created_at
+      `SELECT 
+        u.id,
+        u.email,
+        u.role,
+        u.status,
+        u.last_login,
+        u.created_at,
+        COALESCE(CONCAT(e.first_name, ' ', e.last_name), u.name) AS name,
+        e.phone,
+        d.dept_name AS department,
+        p.position_title AS position,
+        e.emp_id
        FROM users u
+       LEFT JOIN employees e ON u.email = e.email
+       LEFT JOIN departments d ON e.dept_id = d.dept_id
+       LEFT JOIN positions p ON e.position_id = p.position_id
        WHERE u.id = ?`,
       [userId]
     );
@@ -465,9 +484,31 @@ const getMe = async (req, res) => {
       });
     }
 
+    // Return user data with employee information (if available)
+    console.log("AUTH ME USER RAW DATA:", rows[0]);
+    
+    // TEMPORARY FIX: Normalize role - if user.role is 'user', change to 'employee'
+    const normalizedRole = rows[0].role === 'user' ? 'employee' : rows[0].role;
+    
+    const userData = {
+      id: rows[0].id,
+      email: rows[0].email,
+      role: normalizedRole, // Use normalized role
+      status: rows[0].status,
+      last_login: rows[0].last_login,
+      created_at: rows[0].created_at,
+      name: rows[0].name || 'N/A',
+      phone: rows[0].phone || 'N/A',
+      department: rows[0].department || 'N/A',
+      position: rows[0].position || 'N/A',
+      emp_id: rows[0].emp_id || 'N/A'
+    };
+
+    console.log("AUTH ME FINAL RESPONSE:", userData);
+
     return res.status(200).json({
       success: true,
-      data: rows[0]
+      data: userData
     });
 
   } catch (err) {

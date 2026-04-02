@@ -10,19 +10,35 @@ const {
 const { verifyToken, verifyRole } = require('../middleware/authMiddleware');
 const { ROLES } = require('../constants/roles');
 
-// ADMIN, HR only - all attendance records
+// ALL ROLES - all attendance records with role-based filtering
 router.get('/', verifyToken, (req, res, next) => {
   const role = req.user?.role;
-  if (role === ROLES.ADMIN || role === ROLES.HR) return next();
-  if (role === ROLES.MANAGER) {
+  console.log("Attendance route - User role:", role);
+  
+  // Normalize role for backward compatibility
+  const normalizeRole = (role) => {
+    if (role === "user") return "employee";
+    return role;
+  };
+  
+  const normalizedRole = normalizeRole(role);
+  console.log("Attendance route - Normalized role:", normalizedRole);
+  
+  if (normalizedRole === ROLES.ADMIN || normalizedRole === ROLES.HR) return next();
+  if (normalizedRole === ROLES.MANAGER) {
     req.filterByManager = true; // controller will filter by dept
     return next();
   }
-  if (role === ROLES.USER) {
+  if (normalizedRole === ROLES.USER) {
     req.filterByUser = true; // controller will filter by userId
     return next();
   }
-  return res.status(403).json({ success: false, message: 'Access denied' });
+  return res.status(403).json({ 
+    success: false, 
+    message: 'Access denied',
+    role: normalizedRole,
+    allowedRoles: [ROLES.ADMIN, ROLES.HR, ROLES.MANAGER, ROLES.USER]
+  });
 }, getAllAttendance);
 
 // MANAGER - team attendance only (filter by manager's department)
@@ -30,6 +46,7 @@ router.get('/team', verifyToken, verifyRole([ROLES.MANAGER]), getAllAttendance);
 
 // USER - own attendance only
 router.get('/me', verifyToken, verifyRole([ROLES.USER]), getAllAttendance);
+router.get('/my/month', verifyToken, verifyRole([ROLES.USER]), getAllAttendance);
 
 // ADMIN, HR only - create attendance
 router.post('/', verifyToken, verifyRole([ROLES.ADMIN, ROLES.HR]), createAttendance);

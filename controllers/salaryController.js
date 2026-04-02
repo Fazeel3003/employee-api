@@ -31,6 +31,13 @@ exports.getAllSalaryHistory = async (req, res, next) => {
     const empId = req.query.emp_id || "";
     const offset = (page - 1) * limit;
 
+    console.log('Salary controller - User info:', {
+      user: req.user,
+      filterByUser: req.filterByUser,
+      filterByManager: req.filterByManager,
+      empId
+    });
+
     let whereClause = "";
     let queryParams = [];
 
@@ -42,7 +49,10 @@ exports.getAllSalaryHistory = async (req, res, next) => {
         [req.user.email]
       );
       
+      console.log('Salary filter by user - Employee query result:', empRows);
+      
       if (empRows.length === 0) {
+        console.log('No employee found for email:', req.user.email);
         return res.json({ 
           success: true, 
           data: [], 
@@ -54,6 +64,7 @@ exports.getAllSalaryHistory = async (req, res, next) => {
       
       whereClause = "WHERE emp_id = ?";
       queryParams = [empRows[0].emp_id];
+      console.log('Salary filter - User salary query params:', queryParams);
 
     } else if (req.filterByManager) {
       // MANAGER: only their team's salary

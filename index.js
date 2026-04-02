@@ -13,6 +13,7 @@ const projectRoutes = require("./routes/projectRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 const salaryRoutes = require("./routes/salaryRoutes");
+const managerRoutes = require("./routes/managerRoutes");
 
 require("./db");
 
@@ -30,6 +31,7 @@ app.use(cors({
       'http://localhost:5173',  // Vite dev server
       'http://localhost:3000',  // React dev server
       'http://localhost:5174',  // Alternative Vite port
+      'http://localhost',       // Docker frontend (Nginx on port 80)
       process.env.FRONTEND_URL  // Production frontend URL
     ].filter(Boolean);
     
@@ -127,6 +129,9 @@ app.use("/api/v1/attendance", attendanceRoutes);
 app.use("/api/v1/leave-requests", leaveRoutes);
 
 app.use("/api/v1/salary-history", salaryRoutes);
+
+// ✅ Manager routes (protected)
+app.use("/api/v1/manager", managerRoutes);
 
 const errorHandler = require("./middleware/errorHandler");
 app.use(errorHandler);
