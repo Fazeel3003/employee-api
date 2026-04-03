@@ -21,8 +21,8 @@ const validateRegister = [
     .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
   body('role')
     .optional()
-    .isIn(['admin', 'user', 'manager'])
-    .withMessage('Role must be one of: admin, user, manager')
+    .isIn(['admin', 'employee', 'manager', 'hr'])
+    .withMessage('Role must be one of: admin, employee, manager, hr')
 ];
 
 const validateLogin = [
