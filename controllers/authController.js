@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
+const { createEmployeeForUser } = require('../services/userEmployeeSync');
 
 // JWT Configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key';
@@ -22,9 +23,13 @@ const JWT_EXPIRE = process.env.JWT_EXPIRE || '7d';
  */
 const register = async (req, res) => {
   try {
-    const { name, email, password, role = 'user' } = req.body;
+    const { name, email, password } = req.body;
     const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
     const userAgent = req.get('User-Agent') || 'unknown';
+
+    // SECURITY: Always assign 'employee' role for self-registration
+    // Privileged roles (admin, manager, hr) must be created by administrators
+    const role = 'employee';
 
     // Input validation with industry-level standards
     if (!name || !email || !password) {
@@ -159,6 +164,21 @@ const register = async (req, res) => {
       [name, email, hashedPassword, role]
     );
 
+    // Auto-create employee record for employee role
+    if (role === 'employee') {
+      try {
+        await createEmployeeForUser({
+          userId: result.insertId,
+          name,
+          email,
+          role
+        });
+      } catch (empError) {
+        console.error('Error creating employee record:', empError);
+        // Don't fail signup if employee creation fails - log for manual fix
+      }
+    }
+
     // Log registration event
     await logAuditEvent(result.insertId, 'REGISTER', 'user', result.insertId, clientIP, userAgent, {
       name,
@@ -245,17 +265,12 @@ const login = async (req, res) => {
     }
 
     // Generate JWT token
-    console.log("LOGIN USER DATA:", user);
-    console.log("LOGIN USER ROLE:", user.role);
-    
     const tokenPayload = {
       userId: user.id,
       email: user.email,
       name: user.name,
       role: user.role
     };
-
-    console.log("JWT TOKEN PAYLOAD:", tokenPayload);
 
     const token = jwt.sign(tokenPayload, JWT_SECRET, {
       expiresIn: JWT_EXPIRE,
@@ -441,12 +456,7 @@ const logAuditEvent = async (userId, action, resource, resourceId, ipAddress, us
  */
 const getMe = async (req, res) => {
   try {
-    // Handle all possible JWT payload property names
     const userId = req.user?.userId || req.user?.id || req.user?.user_id || req.user?.sub;
-
-    // Debug: Log what we received
-    console.log('getMe called with userId:', userId);
-    console.log('req.user object:', req.user);
 
     if (!userId) {
       return res.status(401).json({
@@ -484,16 +494,10 @@ const getMe = async (req, res) => {
       });
     }
 
-    // Return user data with employee information (if available)
-    console.log("AUTH ME USER RAW DATA:", rows[0]);
-    
-    // TEMPORARY FIX: Normalize role - if user.role is 'user', change to 'employee'
-    const normalizedRole = rows[0].role === 'user' ? 'employee' : rows[0].role;
-    
     const userData = {
       id: rows[0].id,
       email: rows[0].email,
-      role: normalizedRole, // Use normalized role
+      role: rows[0].role,
       status: rows[0].status,
       last_login: rows[0].last_login,
       created_at: rows[0].created_at,
@@ -503,8 +507,6 @@ const getMe = async (req, res) => {
       position: rows[0].position || 'N/A',
       emp_id: rows[0].emp_id || 'N/A'
     };
-
-    console.log("AUTH ME FINAL RESPONSE:", userData);
 
     return res.status(200).json({
       success: true,

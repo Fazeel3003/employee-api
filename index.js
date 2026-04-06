@@ -14,6 +14,7 @@ const attendanceRoutes = require("./routes/attendanceRoutes");
 const leaveRoutes = require("./routes/leaveRoutes");
 const salaryRoutes = require("./routes/salaryRoutes");
 const managerRoutes = require("./routes/managerRoutes");
+const syncRoutes = require("./routes/syncRoutes");
 
 require("./db");
 
@@ -132,6 +133,9 @@ app.use("/api/v1/salary-history", salaryRoutes);
 
 // ✅ Manager routes (protected)
 app.use("/api/v1/manager", managerRoutes);
+
+// ✅ Admin sync routes (protected)
+app.use("/api/v1/sync", syncRoutes);
 
 const errorHandler = require("./middleware/errorHandler");
 app.use(errorHandler);
