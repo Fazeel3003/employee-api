@@ -523,6 +523,141 @@ const getMe = async (req, res) => {
   }
 };
 
+/**
+ * Update User Profile
+ * PUT /api/v1/auth/update-profile
+ */
+const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id || req.user?.user_id;
+    const { name, email, phone } = req.body;
+    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+    const userAgent = req.get('User-Agent') || 'unknown';
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'User ID not found in token'
+      });
+    }
+
+    // Validate inputs
+    if (!name || !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name and email are required'
+      });
+    }
+
+    // Name validation
+    if (name.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name must be at least 2 characters long'
+      });
+    } else if (name.trim().length > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name must be less than 100 characters'
+      });
+    } else if (!/^[a-zA-Z\s'-]+$/.test(name.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name can only contain letters, spaces, hyphens, and apostrophes'
+      });
+    }
+
+    // Email validation
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    if (!emailRegex.test(email.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please enter a valid email address'
+      });
+    }
+
+    // Phone validation (optional)
+    if (phone && phone.trim()) {
+      const phoneRegex = /^[0-9]{10}$/;
+      if (!phoneRegex.test(phone.trim())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone must be exactly 10 digits'
+        });
+      }
+    }
+
+    // Check if email is already taken by another user
+    const [existingUsers] = await db.query(
+      'SELECT id FROM users WHERE email = ? AND id != ?',
+      [email.trim(), userId]
+    );
+
+    if (existingUsers.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is already taken by another user'
+      });
+    }
+
+    // Update user in database
+    await db.query(
+      'UPDATE users SET name = ?, email = ?, updated_at = NOW() WHERE id = ?',
+      [name.trim(), email.trim(), userId]
+    );
+
+    // Update employee record if exists (sync phone number)
+    if (phone && phone.trim()) {
+      await db.query(
+        'UPDATE employees SET phone = ? WHERE email = ?',
+        [phone.trim(), email.trim()]
+      );
+    }
+
+    // Log audit event
+    await logAuditEvent(userId, 'UPDATE_PROFILE', 'user', userId, clientIP, userAgent, {
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone?.trim() || null
+    });
+
+    // Fetch updated user data
+    const [updatedUser] = await db.query(
+      `SELECT 
+        u.id,
+        u.email,
+        u.role,
+        u.status,
+        u.last_login,
+        u.created_at,
+        COALESCE(CONCAT(e.first_name, ' ', e.last_name), u.name) AS name,
+        e.phone,
+        d.dept_name AS department,
+        p.position_title AS position,
+        e.emp_id
+       FROM users u
+       LEFT JOIN employees e ON u.email = e.email
+       LEFT JOIN departments d ON e.dept_id = d.dept_id
+       LEFT JOIN positions p ON e.position_id = p.position_id
+       WHERE u.id = ?`,
+      [userId]
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: updatedUser[0]
+    });
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while updating profile'
+    });
+  }
+};
+
 // GET ACTIVE SESSIONS COUNT
 const getActiveSessionsCount = async (req, res, next) => {
   try {
@@ -545,5 +680,6 @@ module.exports = {
   getProfile,
   getMe,
   logout,
+  updateProfile,
   getActiveSessionsCount
 };

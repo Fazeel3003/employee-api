@@ -71,6 +71,13 @@ router.post('/login', validateLogin, handleValidationErrors, authController.logi
 router.get('/profile', verifyToken, authController.getProfile);
 
 /**
+ * @route   PUT /api/v1/auth/update-profile
+ * @desc    Update current user profile
+ * @access   Private
+ */
+router.put('/update-profile', verifyToken, authController.updateProfile);
+
+/**
  * @route   POST /api/v1/auth/logout
  * @desc    Logout user (client-side token removal)
  * @access   Private
