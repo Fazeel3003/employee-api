@@ -1,10 +1,9 @@
-const db = require("../db");
+﻿const db = require('../db');
 
-// GET ALL ASSIGNMENTS
 const getAllEmployeeProjects = async (req, res) => {
   try {
     const [rows] = await db.query(
-      `SELECT 
+      `SELECT
         ep.assignment_id,
         ep.emp_id,
         ep.project_id,
@@ -19,66 +18,36 @@ const getAllEmployeeProjects = async (req, res) => {
         p.project_name,
         p.status as project_status
        FROM employee_projects ep
-       INNER JOIN employees e 
-         ON ep.emp_id = e.emp_id
-       INNER JOIN projects p 
-         ON ep.project_id = p.project_id
-       ORDER BY ep.assignment_id DESC`
+       INNER JOIN employees e ON ep.tenant_id = e.tenant_id AND ep.emp_id = e.emp_id
+       INNER JOIN projects p ON ep.tenant_id = p.tenant_id AND ep.project_id = p.project_id
+       WHERE ep.tenant_id = ?
+       ORDER BY ep.assignment_id DESC`,
+      [req.tenantId]
     );
-    
-    res.json({
-      success: true,
-      data: rows,
-      count: rows.length
-    });
+
+    res.json({ success: true, data: rows, count: rows.length });
   } catch (err) {
-    console.error('getAllEmployeeProjects error:', err.message);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch assignments',
-      error: err.message
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch assignments', error: err.message });
   }
 };
 
-// CREATE ASSIGNMENT
 const createAssignment = async (req, res) => {
   try {
-    const {
-      emp_id,
-      project_id,
-      role_name,
-      allocation_percent,
-      assigned_on,
-      released_on
-    } = req.body;
+    const { emp_id, project_id, role_name, allocation_percent, assigned_on, released_on } = req.body;
 
-    // Validate required fields
     if (!emp_id || !project_id || !role_name || !assigned_on) {
-      return res.status(400).json({
-        success: false,
-        message: 'emp_id, project_id, role_name and assigned_on are required'
-      });
+      return res.status(400).json({ success: false, message: 'emp_id, project_id, role_name and assigned_on are required' });
     }
 
-    // Insert with EXACT column names
     const [result] = await db.query(
       `INSERT INTO employee_projects
-        (emp_id, project_id, role_name, allocation_percent, assigned_on, released_on)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        emp_id,
-        project_id,
-        role_name,
-        allocation_percent || 100.00,
-        assigned_on,
-        released_on || null
-      ]
+       (tenant_id, emp_id, project_id, role_name, allocation_percent, assigned_on, released_on)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [req.tenantId, emp_id, project_id, role_name, allocation_percent || 100.0, assigned_on, released_on || null]
     );
 
-    // Fetch created assignment with names
     const [newAssignment] = await db.query(
-      `SELECT 
+      `SELECT
         ep.assignment_id,
         ep.emp_id,
         ep.project_id,
@@ -92,107 +61,45 @@ const createAssignment = async (req, res) => {
         p.project_name,
         p.status as project_status
        FROM employee_projects ep
-       INNER JOIN employees e 
-         ON ep.emp_id = e.emp_id
-       INNER JOIN projects p 
-         ON ep.project_id = p.project_id
-       WHERE ep.assignment_id = ?`,
-      [result.insertId]
+       INNER JOIN employees e ON ep.tenant_id = e.tenant_id AND ep.emp_id = e.emp_id
+       INNER JOIN projects p ON ep.tenant_id = p.tenant_id AND ep.project_id = p.project_id
+       WHERE ep.tenant_id = ? AND ep.assignment_id = ?`,
+      [req.tenantId, result.insertId]
     );
 
-    return res.status(201).json({
-      success: true,
-      message: 'Employee assigned successfully',
-      data: newAssignment[0]
-    });
-
+    return res.status(201).json({ success: true, message: 'Employee assigned successfully', data: newAssignment[0] });
   } catch (err) {
-    console.error('createAssignment error:', err);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to create assignment',
-      error: err.message
-    });
+    return res.status(500).json({ success: false, message: 'Failed to create assignment', error: err.message });
   }
 };
 
-// UPDATE ASSIGNMENT
 const updateAssignment = async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      emp_id,
-      project_id,
-      role_name,
-      allocation_percent,
-      assigned_on,
-      released_on
-    } = req.body;
+    const { emp_id, project_id, role_name, allocation_percent, assigned_on, released_on } = req.body;
 
     await db.query(
       `UPDATE employee_projects SET
-        emp_id = ?,
-        project_id = ?,
-        role_name = ?,
-        allocation_percent = ?,
-        assigned_on = ?,
-        released_on = ?
-       WHERE assignment_id = ?`,
-      [
-        emp_id,
-        project_id,
-        role_name,
-        allocation_percent || 100.00,
-        assigned_on,
-        released_on || null,
-        id
-      ]
+         emp_id = ?, project_id = ?, role_name = ?, allocation_percent = ?, assigned_on = ?, released_on = ?
+       WHERE tenant_id = ? AND assignment_id = ?`,
+      [emp_id, project_id, role_name, allocation_percent || 100.0, assigned_on, released_on || null, req.tenantId, id]
     );
 
-    return res.status(200).json({
-      success: true,
-      message: 'Assignment updated successfully'
-    });
-
+    return res.status(200).json({ success: true, message: 'Assignment updated successfully' });
   } catch (err) {
-    console.error('updateAssignment error:', err);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to update assignment',
-      error: err.message
-    });
+    return res.status(500).json({ success: false, message: 'Failed to update assignment', error: err.message });
   }
 };
 
-// DELETE ASSIGNMENT
 const deleteAssignment = async (req, res) => {
   try {
     const { id } = req.params;
 
-    await db.query(
-      `DELETE FROM employee_projects
-       WHERE assignment_id = ?`,
-      [id]
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: 'Assignment removed successfully'
-    });
-
+    await db.query('DELETE FROM employee_projects WHERE tenant_id = ? AND assignment_id = ?', [req.tenantId, id]);
+    return res.status(200).json({ success: true, message: 'Assignment removed successfully' });
   } catch (err) {
-    console.error('deleteAssignment error:', err);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to delete assignment',
-      error: err.message
-    });
+    return res.status(500).json({ success: false, message: 'Failed to delete assignment', error: err.message });
   }
 };
 
-module.exports = {
-  getAllEmployeeProjects,
-  createAssignment,
-  updateAssignment,
-  deleteAssignment
-};
+module.exports = { getAllEmployeeProjects, createAssignment, updateAssignment, deleteAssignment };
